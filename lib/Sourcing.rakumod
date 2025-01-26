@@ -1,143 +1,110 @@
 no precompilation;
-my %types;
+unit class Sourcing;
 
-role Sourcing { ... }
+has Mu:U     %.command-classes;
+has          &.command-emitter;
+has Mu       $.command-handler = Metamodel::ClassHOW.new_type: :name<Sourcing::CommandHandler>;
 
-role Sourcing::AutoEmit[Str $type] {
+has Mu:U     %.event-classes;
+has          &.event-emitter;
+has Mu       $.event-handler = Metamodel::ClassHOW.new_type: :name<Sourcing::EventHandler>;
+
+method instance { $ //= ::?CLASS.bless }
+method new(|) {!!!}
+
+method set-command-emitter(&emitter) {
+	&!command-emitter = &emitter
+}
+
+multi method set-event-emitter(&emitter) {
+	&!event-emitter = &emitter
+}
+
+method get-command-handler {
+	$!command-handler.^compose;
+	$!command-handler
+}
+
+method get-event-handler {
+	$!event-handler.^compose;
+	$!event-handler
+}
+
+multi trait_mod:<is>(Routine $r, :$sourcing-command) is export {
+	my $class = Sourcing.instance.add-command: $r;
+	$r.wrap: sub (|c) {
+		$class.new: |c
+	}
+}
+
+multi trait_mod:<is>(Routine $r, :$sourcing-event) is export {
+	my $class = Sourcing.instance.add-event: $r;
+	$r.wrap: sub (|c) {
+		$class.new: |c
+	}
+}
+
+role FromSignature[Str $emitter] {
+	method to-map(--> Map()) {
+		self.^attributes.map: {
+			.name.substr(2) => .get_value: self
+		}
+	}
 	method TWEAK(|) {
-		.(self) with Sourcing[$type].instance.emitter
+		.(self) with Sourcing.instance."$emitter"()
 	}
 }
 
-my role Sourcing[Str $type = "command"] {
-	has %.funcs;
-	has %.commands;
-	has &.handler is rw;
-	has &.emitter is rw;
+role Command does FromSignature["command-emitter"] {}
+role Event does FromSignature["event-emitter"] {}
 
-	multi method instance { %types{$type} //= ::?CLASS.bless }
-
-	multi method handle(::?CLASS:D: Sourcing::AutoEmit $cmd) {
-		$.handler.($cmd)
+method add-command(&cmd) {
+	die "Functions can't have positional params to be transformed into a command, {&cmd.name} do not respect that"
+		if &cmd.count;
+	my $name = "{ &cmd.name.tc.subst: /\W(\w)/, { $0.uc }, :g }Command";
+	my &cloned = &cmd.clone;
+	%!command-classes{$name} = my $class = self!class-from-signature($name, &cmd.signature, :roles[Command]);
+	$!command-handler.^add_multi_method: "handle", my method handle(Any: $cmd where $class) {
+		cloned |$cmd.to-map
 	}
+	$class
+}
 
-	method new {!!!}
-
-	method emitter-sub is rw {
-		self.instance.emitter
-	}
-
-	method get-ns(@ns) is raw {
-		my $ptr = %!funcs;
-		for @ns -> Str $path {
-			last without $ptr{$path};
-			$ptr = $ptr{$path};
-		}
-		$ptr
-	}
-
-	sub visitor(%node) {
-		for %node.kv -> Str $key, $_ {
-			when Callable    { take ($key => $_)                     }
-			when Associative { .&visitor                             }
-			default          { die "unexpected value for { .^name }" }
-		}
-	}
-
-	method get-funcs(@ns) {
-		my $ptr = $.get-ns: @ns;
-		gather { visitor $ptr }
-	}
-
-	method add-function(
-		&func where {
-			.count == 0
-			|| fail "Only functions with no positional parameters can be commands"
-		},
-		Str :$name = &func.name,
-		:@ns
-	) {
-		my %funcs := $.get-ns: @ns;
-		%funcs{$name} = &func;
+method add-event(&ev) {
+	die "Functions can't have positional params to be transformed into a event, {&ev.name} do not respect that"
+		if &ev.count;
+	my $name = "{ &ev.name.tc.subst: /\W(\w)/, { $0.uc }, :g }Event";
+	my &cloned = &ev.clone;
+	%!event-classes{$name} = my $class = self!class-from-signature($name, &ev.signature, :roles[Event]);
+	$!event-handler.^add_multi_method: "handle", my method handle(Any: $ev where $class) {
+		cloned |$ev.to-map
 	}
 }
 
-my \Command = Sourcing["command"];
-my \Event   = Sourcing["event"];
-
-multi trait_mod:<is>(Routine $cmd, :$sourcing-command!) is export {
-	my $instance = Command.instance;
-	$instance.add-function: $cmd;
-}
-
-multi trait_mod:<is>(Routine $cmd, :$sourcing-event!) is export {
-	my $instance = Event.instance;
-	$instance.add-function: $cmd;
-}
-
-multi EXPORT("no-commands" --> Map()) {
-	'Command' => Command.^pun,
-	'Event'   => Event.^pun,
-}
-
-multi EXPORT(*@types --> Map()) {
-	@types ||= <command event>;
-
-	'Command' => Command.^pun,
-	'Event'   => Event.^pun,
-
-	'&EXPORT' => sub (@nss = ("",) --> Map()) {
-		|@types.map: -> $type {
-			my $handler = Metamodel::ClassHOW.new_type: :name<Sourcing::Handler>;
-			my $instance = Sourcing[$type].instance;
-			my %cmds = $instance.commands;
-
-			|@nss.map: -> $ns {
-				|Sourcing[$type].instance.get-funcs([ $ns.join("::").split: "::" ]).map: -> (:$key, :$value) {
-					"&$key" => sub (*%named) {
-						%cmds{$key} //= do {
-							my $cmd-name = "{ $key.tc.subst: /\W(\w)/, { $0.uc }, :g }{ tc "Command" }";
-							my $cmd = Metamodel::ClassHOW.new_type: :name($cmd-name);
-							$cmd.^add_role: Sourcing::AutoEmit["command"];
-							for $value.signature.params.grep(*.named) -> $param {
-								my Str $par-name = .named_names.head // .name with $param;
-								my Str $attr-name = $param.name.subst: /^(<[$@%&]>)(\w+)$/, { "$0!$1" };
-								my $attr = Attribute.new:
-									:name($attr-name),
-									:1ro,
-									:1has_accessor,
-									:type($param.type),
-									:package($cmd),
-								;
-								$cmd.^add_attribute: $attr;
-								use nqp;
-								nqp::bindattr(
-									$attr<>,
-									Attribute,
-									'$!required',
-									1,
-								) if not $param.optional;
-							}
-							$cmd.^add_method: 'to-map', my method (--> Map()) {
-								self.^attributes.map: {
-									.name.substr(2) => .get_value: self
-								}
-							}
-							$cmd.^compose;
-							$cmd
-						}
-						$handler.^add_multi_method: "CALL-ME", my method ($command where { $_ ~~ %cmds{$key} }) {
-							$value.(|$command.to-map)
-						}
-						$handler.^add_role: Callable;
-						$handler.^compose;
-						$instance.handler = $handler;
-						%cmds{$key}.new: |%named
-					}
-				}
-			}
-		}
+method !class-from-signature(Str $class-name, Signature $sig, :@roles) {
+	my $class = Metamodel::ClassHOW.new_type: :name($class-name);
+	$class.^add_role: $_ for @roles;
+	for $sig.params.grep(*.named) -> $param {
+		my Str $par-name = .named_names.head // .name with $param;
+		my Str $attr-name = $param.name.subst: /^(<[$@%&]>)(\w+)$/, { "$0!$1" };
+		my $attr = Attribute.new:
+			:name($attr-name),
+			:1ro,
+			:1has_accessor,
+			:type($param.type),
+			:package($class),
+		;
+		$class.^add_attribute: $attr;
+		use nqp;
+		nqp::bindattr(
+			$attr<>,
+			Attribute,
+			'$!required',
+			1,
+		) if not $param.optional;
 	}
+	$class.^compose;
+	$class
 }
 
 =begin pod
