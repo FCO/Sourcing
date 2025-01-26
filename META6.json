@@ -12,7 +12,9 @@
   "name": "Sourcing",
   "perl": "6.d",
   "provides": {
-    "Sourcing": "lib/Sourcing.rakumod"
+    "Sourcing": "lib/Sourcing.rakumod",
+    "Sourcing::Command": "lib/Sourcing.rakumod",
+    "Sourcing::Event": "lib/Sourcing.rakumod"
   },
   "resources": [
   ],
