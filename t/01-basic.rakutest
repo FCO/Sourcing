@@ -1,0 +1,6 @@
+use Test;
+use Sourcing;
+
+pass "replace me";
+
+done-testing;
