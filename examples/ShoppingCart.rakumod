@@ -1,15 +1,17 @@
 use Sourcing;
+use ShoppingCartCreated;
+use ShoppingCartItemAdded;
 
-unit projection ShoppingCart;
+unit projection ShoppingCart is aggregated-by<user>;
 
 has UInt $.user;
 has UInt @.items;
 has Bool $.done = False;
 
-method shopping-cart-created(UInt :$user) {
-	$!user = $user;
+method created(ShoppingCartCreated $_) {
+	$!user = .user;
 }
 
-method shopping-cart-item-added(UInt :$user where { $_ eq $!user }, UInt :$item) {
-	@!items.push: $item
+method item-added(ShoppingCartItemAdded $_) {
+	@!items.push: .item
 }

@@ -11,5 +11,16 @@ method add-event($event) {
 }
 
 method query($query) {
-	@!events.grep: { $query.^expects-event: $_ }
+	CATCH {
+		default {
+			.say
+		}
+	}
+	say $query;
+	my $projection = $query<projection>.new;
+	my $id-field = $projection.^is-aggregated-by;
+	for @!events.grep: { ."$id-field"() eqv $query<id> } -> $event {
+		$projection.apply: $event
+	}
+	$query<response>.keep: $projection
 }

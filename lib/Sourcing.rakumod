@@ -4,6 +4,7 @@ class Sourcing {
 	has          &.command-emitter;
 	has Mu       $.command-handler = Metamodel::ClassHOW.new_type: :name<Sourcing::CommandHandler>;
 	has          &.event-emitter;
+	has          &.query-emitter;
 
 	method instance { $ //= ::?CLASS.bless }
 	method new(|) {!!!}
@@ -16,23 +17,22 @@ class Sourcing {
 		&!event-emitter = &emitter
 	}
 
+	method set-query-emitter(&emitter) {
+		&!query-emitter = &emitter
+	}
+
 	method get-command-handler {
 		$!command-handler.^compose;
 		$!command-handler
 	}
 
-	role FromSignature[Str $emitter] {
+	role Command {
 		method to-map(--> Map()) {
 			self.^attributes.map: {
 				.name.substr(2) => .get_value: self
 			}
 		}
-		method TWEAK(|) {
-			.(self) with Sourcing.instance."$emitter"()
-		}
 	}
-
-	role Command does FromSignature["command-emitter"] {}
 
 	method add-command(&cmd) {
 		die "Functions can't have positional params to be transformed into a command, {&cmd.name} do not respect that"
@@ -71,13 +71,24 @@ class Sourcing {
 		$class.^compose;
 		$class
 	}
+
+	role AggregatedBy {
+		has $.aggregated-by-field;
+		method is-aggregated-by($) { $!aggregated-by-field }
+	}
 }
 
 multi trait_mod:<is>(Routine $r, :$sourcing-command) is export {
 	my $class = Sourcing.instance.add-command: $r;
 	$r.wrap: sub (|c) {
-		$class.new: |c
+		my $obj = $class.new: |c;
+		.($obj) with Sourcing.instance.command-emitter;
+		$obj
 	}
+}
+
+multi trait_mod:<is>(Mu $r, :$aggregated-by!) is export {
+	$r.HOW does Sourcing::AggregatedBy($aggregated-by)
 }
 
 multi EXPORT(*@events --> Map()) {
