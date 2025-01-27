@@ -19,7 +19,7 @@ method query($query) {
 	say $query;
 	my $projection = $query<projection>.new;
 	my $id-field = $projection.^is-aggregated-by;
-	for @!events.grep: { ."$id-field"() eqv $query<id> } -> $event {
+	for @!events.grep: { $_ ~~ any($query<event-classes>) && ."$id-field"() eqv $query<id> } -> $event {
 		$projection.apply: $event
 	}
 	$query<response>.keep: $projection
