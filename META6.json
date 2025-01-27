@@ -12,13 +12,12 @@
   "name": "Sourcing",
   "perl": "6.d",
   "provides": {
-    "Sourcing": "lib/Sourcing.rakumod",
-    "Sourcing::Command": "lib/Sourcing.rakumod",
-    "Sourcing::Event": "lib/Sourcing.rakumod"
+    "Metamodel::ProjectionHOW": "lib/Metamodel/ProjectionHOW.rakumod",
+    "Sourcing": "lib/Sourcing.rakumod"
   },
   "resources": [
   ],
-  "source-url": "",
+  "source-url": "https://github.com/FCO/Sourcing.git",
   "tags": [
   ],
   "test-depends": [

@@ -1,3 +1,5 @@
+[![Actions Status](https://github.com/FCO/Sourcing/actions/workflows/test.yml/badge.svg)](https://github.com/FCO/Sourcing/actions)
+
 NAME
 ====
 
@@ -18,7 +20,7 @@ Sourcing is ...
 AUTHOR
 ======
 
-Fernando Corrêa de Oliveira <fernando.correa@humanstate.com>
+Fernando Corrêa de Oliveira <fco@cpan.org>
 
 COPYRIGHT AND LICENSE
 =====================
