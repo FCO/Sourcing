@@ -12,8 +12,18 @@
   "name": "Sourcing",
   "perl": "6.d",
   "provides": {
+    "Metamodel::AggregationHOW": "lib/Metamodel/AggregationHOW.rakumod",
+    "Metamodel::EventHOW": "lib/Metamodel/EventHOW.rakumod",
+    "Metamodel::ProcessHOW": "lib/Metamodel/ProcessHOW.rakumod",
     "Metamodel::ProjectionHOW": "lib/Metamodel/ProjectionHOW.rakumod",
-    "Sourcing": "lib/Sourcing.rakumod"
+    "Sourcing": "lib/Sourcing.rakumod",
+    "Sourcing::AggregationId": "lib/Sourcing/AggregationId.rakumod",
+    "Sourcing::Event": "lib/Sourcing/Event.rakumod",
+    "Sourcing::EventStore": "lib/Sourcing/EventStore.rakumod",
+    "Sourcing::EventStore::Memory": "lib/Sourcing/EventStore/Memory.rakumod",
+    "Sourcing::Manager": "lib/Sourcing/Manager.rakumod",
+    "Sourcing::Projection": "lib/Sourcing/Projection.rakumod",
+    "Sourcing::ProjectionClient": "lib/Sourcing/ProjectionClient.rakumod"
   },
   "resources": [
   ],

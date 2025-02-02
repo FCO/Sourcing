@@ -2,16 +2,18 @@ use Sourcing;
 use ShoppingCartCreated;
 use ShoppingCartItemAdded;
 
-unit projection ShoppingCart is aggregated-by<user>;
+unit projection ShoppingCart;
 
-has UInt $.user;
+has UInt $.user is aggregation-id;
 has UInt @.items;
 has Bool $.done = False;
 
-method created(ShoppingCartCreated $_) {
+multi method apply(ShoppingCartCreated $_) {
+	say "apply: ", $_;
 	$!user = .user;
 }
 
-method item-added(ShoppingCartItemAdded $_) {
+multi method apply(ShoppingCartItemAdded $_) {
+	say "apply: ", $_;
 	@!items.push: .item
 }

@@ -22,5 +22,10 @@ method query($query) {
 	for @!events.grep: { $_ ~~ any($query<event-classes>) && ."$id-field"() eqv $query<id> } -> $event {
 		$projection.apply: $event
 	}
-	$query<response>.keep: $projection
+	.keep: $projection with $query<response>;
+	$projection
+}
+
+method run-projection(% (:$projection, :@event-classes, :$response, :$id, |)) {
+	my $proj = $projection.new;
 }
