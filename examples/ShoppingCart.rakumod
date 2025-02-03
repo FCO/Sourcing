@@ -1,6 +1,7 @@
 use Sourcing;
 use ShoppingCartCreated;
 use ShoppingCartItemAdded;
+use ShoppingCartDone;
 
 unit projection ShoppingCart;
 
@@ -16,4 +17,13 @@ multi method apply(ShoppingCartCreated $_) {
 multi method apply(ShoppingCartItemAdded $_) {
 	say "apply: ", $_;
 	@!items.push: .item
+}
+
+multi method apply(ShoppingCartDone $_) {
+	say "apply: ", $_;
+	$!done = True
+}
+
+method get-items is query {
+	@!items.join: ", "
 }

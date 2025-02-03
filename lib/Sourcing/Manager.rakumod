@@ -3,6 +3,7 @@ use Tuple;
 use Sourcing::Event;
 use Sourcing::Projection;
 use Sourcing::EventStore;
+use Sourcing::EventStore::Memory;
 unit projection Sourcing::Manager;
 
 class ProjectionInfo {
@@ -46,12 +47,12 @@ class ProjectionInfo {
 	}
 }
 
-has Sourcing::EventStore $.event-store is required;
-has ProjectionInfo       %.info{Sourcing::Projection:U};
-has                      %.event{Sourcing::Event:U};
+has Sourcing::EventStore:D $.event-store = Sourcing::EventStore::Memory.new;
+has ProjectionInfo         %.info{Sourcing::Projection:U};
+has                        %.event{Sourcing::Event:U};
 
 method TWEAK(:$event-store, |) {
-	$event-store.attach-projection: self, :from-beginnig
+	$!event-store.attach-projection: self, :from-beginnig
 }
 
 method gist {
@@ -64,7 +65,7 @@ method gist {
 		do for %!event.kv -> $event, @info {
 			"{ $event.^name }\n{ @info>>.gist.join("\n").indent: 4 }"
 		}.join("\n").indent(4),
-		"event-store: { $!event-store.gist }"
+		#"event-store: { $!event-store.gist }"
 	).join: "\n"
 }
 
@@ -72,6 +73,7 @@ multi method register-projection-class(::?CLASS $proj) {}
 
 multi method register-projection-class(Sourcing::Projection $proj) {
 	$proj.HOW.event-store = $.event-store;
+	$proj.HOW.manager = self;
 	my $info = %!info{$proj.WHAT} = ProjectionInfo.new: $proj;
 	for |$proj.^applyable-events -> Sourcing::Event $event {
 		%!event{$event.WHAT}.push: $info;

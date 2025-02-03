@@ -2,36 +2,76 @@ unit class Metamodel::ProjectionHOW is Metamodel::ClassHOW;
 use Sourcing::ProjectionClient;
 use Sourcing::Projection;
 use Sourcing::EventStore;
+use Tuple;
 
 has                      $!client;
 has Sourcing::EventStore $.event-store is rw;
+has                      $.manager     is rw;
+
+class Query {
+	has         $.vow    is required;
+	has Str     $.method is required;
+	has Capture $.capture = \();
+}
 
 method client(Mu $proj) {
 	use Sourcing::ProjectionClient;
 	return $!client if $!client ~~ Sourcing::ProjectionClient;
+
+	my $info := $!manager.info{$proj};
 	$!client := Metamodel::ClassHOW.new_type: :name("{self.name: $proj}::Client");
-	$!client.^add_role: Sourcing::ProjectionClient;
+
 	given $!client {
+		.^add_role: Sourcing::ProjectionClient;
+		my &query = my method (Str $method, $ids, |c) {
+			my %instances is Map = $info.instance.kv.map: -> Tuple $key, $_ {
+				$key.join(";") => .query-supplier;
+			}
+			my Promise $reply .= new;
+			my Query $query .= new: :vow($reply.vow), :$method, :capture(c);
+			.emit: $query with %instances{$ids.join: ";"};
+			await $reply
+		}
 		for $proj.^attributes -> $attr {
-			my $attr-clone = Attribute.new:
-				:name($attr.name),
-				:1ro,
-				:1has_accessor,
-				:type($attr.type),
-				:package($_),
-			;
-			use nqp;
-			nqp::bindattr(
-				$attr-clone<>,
-				Attribute,
-				'$!required',
-				1,
-			) if $attr.required;
-			.^add_attribute: $attr-clone;
+			if $attr.?is-aggregaion-id {
+				my $attr-clone = Attribute.new:
+					:name($attr.name),
+					:1ro,
+					:1has_accessor,
+					:type($attr.type),
+					:package($_),
+				;
+				use nqp;
+				nqp::bindattr(
+					$attr-clone<>,
+					Attribute,
+					'$!required',
+					1,
+				) if $attr.required;
+				.^add_attribute: $attr-clone;
+			} else {
+				next unless $attr.has_accessor;
+				my Str $name = $attr.name.substr: 2;
+				.^add_method: $name, my method (|c) {
+					my Tuple() $ids = do for $proj.^aggregation-ids-attrs {
+						self."{ .name.substr: 2 }"()
+					}
+					query self, $name, $ids, |c
+				}
+			}
+		}
+		for $proj.^methods.grep({ .?is-query }) -> $method {
+			my Str $name = $method.name;
+			.^add_method: $name, my method (|c) {
+				my Tuple() $ids = do for $proj.^aggregation-ids-attrs {
+					self."{ .name.substr: 2 }"()
+				}
+				query self, $name, $ids, |c
+			}
 		}
 		.^compose;
 	}
-	self.Metamodel::ClassHOW::compose: $proj;
+	$!client
 }
 
 method compose(Mu $proj) {
@@ -51,8 +91,8 @@ method aggregation-ids-attrs($proj) {
 	$proj.^attributes.grep: Sourcing::AggregationId;
 }
 
-method aggregation-ids-values($proj --> List()) {
-	do for $proj.aggregation-ids-attrs($proj) {
+method aggregation-ids-values($proj --> Tuple()) {
+	do for $proj.^aggregation-ids-attrs {
 		.get_value: $proj
 	}
 }
