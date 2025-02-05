@@ -1,5 +1,4 @@
 use Sourcing;
-use Tuple;
 use Sourcing::Event;
 use Sourcing::Projection;
 use Sourcing::EventStore;
@@ -25,7 +24,7 @@ class ProjectionInfo {
 
 	has          $.projection;
 	has          @.agg-ids is List;
-	has Instance %.instance{Tuple};
+	has Instance %.instance;
 
 	multi method new(Sourcing::Projection:U $proj) {
 		::?CLASS.new:
@@ -39,8 +38,8 @@ class ProjectionInfo {
 			$!projection.^name,
 			"agg-ids: @!agg-ids[]",
 			|(
-				do for %!instance.kv -> @key, $instance {
-					"{ @key.gist }\n{ $instance.gist.indent: 4 }"
+				do for %!instance.kv -> Str $key, $instance {
+					"{ $key }\n{ $instance.gist.indent: 4 }"
 				}.join("\n").indent: 4
 			)
 		).join: "\n"
@@ -86,6 +85,6 @@ multi method apply(Sourcing::Event $event) {
 	for @infos -> $info {
 		my @ids  = $info.projection.^aggregation-ids-from-event: $event;
 		my %ids  = |($info.agg-ids.map(*.name.substr(2)) Z=> @ids);
-		$info.instance{Tuple.new: @ids} //= ProjectionInfo::Instance.new: $info.projection, |%ids;
+		$info.instance{@ids.join: ";"} //= ProjectionInfo::Instance.new: $info.projection, |%ids;
 	}
 }
