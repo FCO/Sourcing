@@ -1,14 +1,23 @@
 use Sourcing::AggregationId;
+use Sourcing::ProjectionArg;
+use Sourcing::Projection;
+use Sourcing::Utils;
 
 multi trait_mod:<is>(Attribute $r, Bool :$aggregation-id!) is export {
 	trait_mod:<is>($r, :required);
 	$r does Sourcing::AggregationId
 }
 
+multi trait_mod:<is>(Attribute $r, Bool :$projection-arg!) is export {
+	$r does Sourcing::ProjectionArg
+}
+
 multi trait_mod:<is>(Routine $r, Bool :$query!) is export {
-	$r does role {
-		method is-query { True }
-	}
+	querify $r;
+}
+
+multi trait_mod:<is>(Routine $r, Bool :$command!) is export {
+	commandify $r;
 }
 
 my package EXPORTHOW {

@@ -1,24 +1,24 @@
-use ShoppingCart;
-use ShoppingCartItemAdded;
-use ShoppingCartCreated;
-use ShoppingCartDone;
+use Sourcing::EventStore::Red;
+use ShoppingCartAgg;
 use Sourcing::Manager;
 
 my $manager = Sourcing::Manager.new;
-$manager.register-projection-class: ShoppingCart;
 
-my @users = ^5;
+$manager.register-class: ShoppingCartAgg;
 
-race for @users.race(:8degree, :1batch) -> $user {
-	$manager.event-store.add-event: ShoppingCartCreated.new: :$user;
-	start {
-		$manager.event-store.add-event: ShoppingCartItemAdded.new: :$user, :item($_)
-	} for (1 .. 10).roll: (^10 + 1).pick;
-	$manager.event-store.add-event: ShoppingCartDone.new: :$user;
+my $*EVENT-STORE = Sourcing::EventStore::Red.new;
+$manager.receive-events;
+
+for [1,2,3] -> $user {
+	my $cart = $manager.get: ShoppingCartAgg, :$user;
+	$cart.create-shopping-cart: $user;
+	$cart.add-item: ++$
 }
 
-say $manager;
+for [3,2,1] -> $user {
+	my $cart = $manager.get: ShoppingCartAgg, :$user;
+	$cart.add-item: $user + 10;
+	$cart.finish
+}
 
-my $sc = ShoppingCart.^client.new: :3user;
-say $sc.items;
-say $sc.get-items;
+say ShoppingCartAgg.new: :user($_) for 1, 2, 3

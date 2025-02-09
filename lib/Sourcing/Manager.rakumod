@@ -1,90 +1,92 @@
+use v6.e.PREVIEW;
 use Sourcing;
+unit projection Sourcing::Manager;
+
+#use Sourcing::EventStore::Red;
 use Sourcing::Event;
 use Sourcing::Projection;
 use Sourcing::EventStore;
-use Sourcing::EventStore::Memory;
-unit projection Sourcing::Manager;
 
-class ProjectionInfo {
-	class Instance {
-		has Supplier               $.query-supplier is required;
-		has Sourcing::Projection:D $.instance       is required;
+has %.events;
+has %.instances;
 
-		multi method new(Sourcing::Projection $proj, *%agg-ids) {
-			my $instance       = $proj.new: |%agg-ids;
-			my $query-supplier = $instance.^query-supplier;
+has Lock::Async $!manager-lock .= new;
 
-			$instance.HOW.event-store.attach-projection: $instance, :from-beginnig;
-
-			::?CLASS.bless: :$query-supplier, :$instance
+method TWEAK(|) {
+	Supply.interval(1).tap: {
+		for %!instances.values -> $value {
+			$!manager-lock.protect: {
+				next without $value<instances>;
+				if process-path($value<instances>) {
+					$value<instances>:delete
+				}
+			}
 		}
-
-		method gist { $!instance.gist }
 	}
-
-	has          $.projection;
-	has          @.agg-ids is List;
-	has Instance %.instance;
-
-	multi method new(Sourcing::Projection:U $proj) {
-		::?CLASS.new:
-			projection => $proj,
-			agg-ids    => $proj.^aggregation-ids-attrs,
-			events     => $proj.^applyable-events,
-	}
-
-	method gist {
-		(
-			$!projection.^name,
-			"agg-ids: @!agg-ids[]",
-			|(
-				do for %!instance.kv -> Str $key, $instance {
-					"{ $key }\n{ $instance.gist.indent: 4 }"
-				}.join("\n").indent: 4
-			)
-		).join: "\n"
-	}
+	nextsame;
 }
 
-has Sourcing::EventStore:D $.event-store = Sourcing::EventStore::Memory.new;
-has ProjectionInfo         %.info{Sourcing::Projection:U};
-has                        %.event{Sourcing::Event:U};
-
-method TWEAK(:$event-store, |) {
-	$!event-store.attach-projection: self, :from-beginnig
+multi process-path(Sourcing::Projection $proj) {
+	$proj.should-it-be-killed: DateTime.now
 }
 
-method gist {
-	(
-		"info:",
-		do for %!info.kv -> $proj, $info {
-			"{ $proj.^name }\n{ $info.gist.indent: 4 }"
-		}.join("\n").indent(4),
-		"event:",
-		do for %!event.kv -> $event, @info {
-			"{ $event.^name }\n{ @info>>.gist.join("\n").indent: 4 }"
-		}.join("\n").indent(4),
-		#"event-store: { $!event-store.gist }"
-	).join: "\n"
+multi process-path(%node where { .elems == 1 }) {
+	for %node.kv -> $key, $value {
+		if process-path($value) {
+			%node{$key}:delete;
+			return True
+		}
+	}
+	False
 }
 
-multi method register-projection-class(::?CLASS $proj) {}
+multi process-path(%node) {
+	for %node.kv -> $key, $value {
+		if process-path($value) {
+			%node{$key}:delete;
+		}
+	}
+	False
+}
 
-multi method register-projection-class(Sourcing::Projection $proj) {
-	$proj.HOW.event-store = $.event-store;
-	$proj.HOW.manager = self;
-	my $info = %!info{$proj.WHAT} = ProjectionInfo.new: $proj;
-	for |$proj.^applyable-events -> Sourcing::Event $event {
-		%!event{$event.WHAT}.push: $info;
+method get(::T $type is copy, *%values --> T) is query {
+	self._receive-events;
+	$type = .^name without $type;
+
+	my :(:$class, :%instances) := %!instances{$type};
+
+	my @ids = |$class.^aggregation-ids-names, |$class.^projection-arg-names;
+
+	my @values = @ids.map: { %values{$_} }
+
+	%instances{||@values} //= $class.new: |%values
+}
+
+multi method register-class(Sourcing::Projection $proj) {
+	$!manager-lock.protect: {
+		my @ids = $proj.^aggregation-ids-attrs.map: *.name.substr: 2;
+		%!instances{$proj.^name}<class> = $proj;
+		for $proj.^applyable-events -> $event {
+			%!events.push: $event.^name => $proj
+		}
 	}
 }
 
 multi method apply(Sourcing::Event $event) {
-	my @infos = %!event{$event.WHAT}<>;
-	die "Unexpected event $event.raku()" unless @infos;
-	for @infos -> $info {
-		my @ids  = $info.projection.^aggregation-ids-from-event: $event;
-		my %ids  = |($info.agg-ids.map(*.name.substr(2)) Z=> @ids);
-		$info.instance{@ids.join: ";"} //= ProjectionInfo::Instance.new: $info.projection, |%ids;
+	my @classes = gather for |$event.^mro, |$event.^roles -> $parent {
+		for %!events{ $parent.^name } {
+			.take with %!instances{.^name}
+		}
+	};
+	die "Unexpected event $event.raku() (@classes[])" unless @classes;
+	for @classes <-> %item (:$class!, :%instances, |) {
+		my @agg = $class.^aggregation-ids-from-event: $event;
+		my %agg is Map = $class.^aggregation-ids-map-from-event: $event;
+		my @arg = #class.^projection-arg-from-event: $event;
+		my %arg is Map = $class.^projection-arg-map-from-event: $event;
+		my @path = |@agg, |@arg;
+		my $instance = %instances{||@path} //= $class.new: |%agg, |%arg;
+		$!manager-lock.protect: { %item<instances> = %instances }
+		#$instance.receive-events
 	}
 }

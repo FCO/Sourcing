@@ -1,0 +1,90 @@
+use Test;
+use Sourcing;
+use Sourcing::EventStore::Red;
+my $*RED-FALLBACK = False;
+
+event Test1 { has $.a; has Str $.b = "bla" }
+event Test2 { has $.a; has Str $.c = "bla" }
+
+my $es = Sourcing::EventStore::Red.new; #: :pars{ :database<a.db> };
+#my $*RED-DEBUG = True;
+
+my @events;
+lives-ok {
+	$es.add-event: my $ev = Test1.new: :1a;
+	@events.push: $ev
+}
+
+compare-get-events $es, \(                        ), @events;
+compare-get-events $es, \(                        ), @events;
+compare-get-events $es, \(1                       ), [];
+compare-get-events $es, \(                        ), @events;
+compare-get-events $es, \(:types["Test1",]        ), @events;
+compare-get-events $es, \(:types["Test2",]        ), [];
+compare-get-events $es, \(:types["Test1", "Test2"]), @events;
+compare-get-events $es, \(:1a                     ), @events;
+compare-get-events $es, \(:1a, :b<bla>            ), @events;
+compare-get-events $es, \(:2a                     ), [];
+compare-get-events $es, \(:2a, :b<bla>            ), [];
+
+lives-ok {
+	$es.add-event: my $ev = Test1.new: :1a;
+	@events.push: $ev
+}
+
+compare-get-events $es, \(                        ), @events;
+compare-get-events $es, \(                        ), @events;
+compare-get-events $es, \(1                       ), [@events.tail];
+compare-get-events $es, \(2                       ), [];
+compare-get-events $es, \(                        ), @events;
+compare-get-events $es, \(:types["Test1",]        ), @events;
+compare-get-events $es, \(:types["Test2",]        ), [];
+compare-get-events $es, \(:types["Test1", "Test2"]), @events;
+compare-get-events $es, \(:1a                     ), @events;
+compare-get-events $es, \(:1a, :b<bla>            ), @events;
+compare-get-events $es, \(:2a                     ), [];
+compare-get-events $es, \(:2a, :b<bla>            ), [];
+
+lives-ok {
+	$es.add-event: my $ev = Test2.new: :1a;
+	@events.push: $ev
+}
+
+compare-get-events $es, \(                        ), @events;
+compare-get-events $es, \(                        ), @events;
+compare-get-events $es, \(1                       ), [@events.tail: 2];
+compare-get-events $es, \(2                       ), [@events.tail: 1];
+compare-get-events $es, \(3                       ), [];
+compare-get-events $es, \(                        ), @events;
+compare-get-events $es, \(:types["Test1",]        ), [@events.head: 2];
+compare-get-events $es, \(:types["Test2",]        ), [@events.tail];
+compare-get-events $es, \(:types["Test1", "Test2"]), @events;
+compare-get-events $es, \(:1a                     ), @events;
+compare-get-events $es, \(:1a, :b<bla>            ), [@events.head: 2];
+compare-get-events $es, \(:2a                     ), [];
+compare-get-events $es, \(:2a, :b<bla>            ), [];
+
+done-testing;
+
+multi compare-get-events($es, Capture $c, @expected) is test-assertion {
+	my @got = $es.get-events: |$c;
+	subtest $c.gist, {
+		diag "got     : @got.raku()";
+		diag "expected: @expected.raku()";
+		is @got.elems, @expected.elems;
+		for @got Z @expected -> ($gitem, $eitem) {
+			diag $eitem.^name;
+			compare $gitem, $eitem
+		}
+	}
+}
+multi compare($got, $expected) {
+	subtest "$got.gist() cmp $expected.gist()", {
+		isa-ok $got, $expected.WHAT;
+		return unless $got ~~ $expected.WHAT;
+		for $expected.^attributes -> $attr {
+			isa-ok $attr, Attribute;
+			is $attr.get_value($got), $attr.get_value($expected), "-> $attr.name()"
+		}
+	}
+}

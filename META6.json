@@ -20,9 +20,10 @@
     "Sourcing::AggregationId": "lib/Sourcing/AggregationId.rakumod",
     "Sourcing::Event": "lib/Sourcing/Event.rakumod",
     "Sourcing::EventStore": "lib/Sourcing/EventStore.rakumod",
-    "Sourcing::EventStore::Memory": "lib/Sourcing/EventStore/Memory.rakumod",
+    "Sourcing::EventStore::Red": "lib/Sourcing/EventStore/Red.rakumod",
     "Sourcing::Manager": "lib/Sourcing/Manager.rakumod",
     "Sourcing::Projection": "lib/Sourcing/Projection.rakumod",
+    "Sourcing::ProjectionArg": "lib/Sourcing/ProjectionArg.rakumod",
     "Sourcing::ProjectionClient": "lib/Sourcing/ProjectionClient.rakumod"
   },
   "resources": [
