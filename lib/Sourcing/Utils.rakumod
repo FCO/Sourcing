@@ -1,3 +1,8 @@
+sub event-store is export {
+	require Sourcing::EventStore::Red;
+	$*EVENT-STORE // $GLOBAL::EVENT-STORE //= Sourcing::EventStore::Red.new
+}
+
 sub lockify(Routine $r) is export {
 	$r.wrap: my method (\SELF: |c) {
 		my &run-method = nextcallee;

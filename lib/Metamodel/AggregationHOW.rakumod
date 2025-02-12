@@ -9,15 +9,14 @@ method compose(Mu $proj) {
 	self.add_role: $proj, Sourcing::Aggregation;
 	callsame;
 	for |$.applyable-events: $proj -> Sourcing::Event $event {
-		my $name = camel-to-kebab-case $event.^name;
+		my $name = camel-to-kebab-case $event.^shortname;
 		next if $proj.^find_method: $name;
-		say "creating method: $name";
 		$proj.^add_method: $name, my method (|c) {
 			my %agg is Map = self.^aggregation-ids-map with self;
 			my %arg is Map = self.^projection-arg-map  with self;
 
 			my Sourcing::Event $ev = $event.new: |%agg, |%agg, |c;
-			$*EVENT-STORE.add-event: $ev
+			event-store.add-event: $ev
 		}
 	}
 	nextsame;

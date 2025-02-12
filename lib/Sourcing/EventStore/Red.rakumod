@@ -48,6 +48,7 @@ method TWEAK(|) {
 }
 
 method add-event(Sourcing::Event $event) {
+	#say "add-event: ", $event;
 	my $*RED-DB = $!db;
 
 	red-do :transaction, {
@@ -64,6 +65,7 @@ method add-event(Sourcing::Event $event) {
 		}
 
 		for %data.kv -> Str $field, $value {
+			next if $value ~~ Positional|Associative;
 			EventField.^create: :event-id($entry.id), :$field, :$value
 		}
 
@@ -113,7 +115,5 @@ method get-events(Int $index = -1, :@types, Instant :$from-timestamp, Instant :$
 
 	my @events = $events.sort(*.id).Seq;
 
-	@events.map: {
-		.to-event
-	}
+	@events.map: { .to-event }
 }

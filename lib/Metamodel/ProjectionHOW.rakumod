@@ -19,13 +19,6 @@ method compose(Mu $proj) {
 	nextsame;
 }
 
-method apply($proj, *@events) {
-	use Sourcing::Event;
-	do for @events -> Sourcing::Event $event {
-		$proj.apply: $event
-	}
-}
-
 method projection-arg-attrs($proj) {
 	use Sourcing::ProjectionArg;
 	$proj.^attributes.grep: Sourcing::ProjectionArg;
@@ -83,7 +76,6 @@ method applyable-events($proj --> List()) {
 	do for self.find_method($proj, "apply").candidates -> &cand {
 		my $type = &cand.signature.params.skip.head.type;
 		next unless $type ~~ Sourcing::Event;
-		next if $type<> === Sourcing::Event;
 		$type
 	}
 }

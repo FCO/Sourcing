@@ -4,7 +4,7 @@ use Sourcing::Projection;
 use Sourcing::Utils;
 
 multi trait_mod:<is>(Attribute $r, Bool :$aggregation-id!) is export {
-	trait_mod:<is>($r, :required);
+	#trait_mod:<is>($r, :required);
 	$r does Sourcing::AggregationId
 }
 
