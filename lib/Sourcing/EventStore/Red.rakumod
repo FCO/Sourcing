@@ -24,6 +24,7 @@ model Event is table<event> {
 			$t = ::($.type);
 		}
 		$*SOURCING-MESSAGE-SEQ = $.id if $*SOURCING-MESSAGE-SEQ !~~ Failure;
+		#say $.data;
 		$t.new: |$.data
 	}
 }
@@ -100,6 +101,7 @@ method get-events(Int $index = -1, :@types, Instant :$from-timestamp, Instant :$
 	}
 
 	$events .= grep(*.id > $index);
+
 
 	if @types {
 		$events .= grep: { .type in EventClass.^all.grep({ .parent in @types }).map: *.type };

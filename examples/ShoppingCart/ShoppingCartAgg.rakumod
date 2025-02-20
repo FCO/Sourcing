@@ -10,9 +10,15 @@ has DateTime $.created-at;
 has UInt     @.items;
 has Bool     $.done = False;
 
-method create-shopping-cart($user) is command {
-	die "Shopping cart for user $user already created" if $!created-at;
-	$.shopping-cart-created: :$user;
+multi method create-shopping-cart(::?CLASS:U: $user) {
+	my $new = $.new(:$user);
+	$new.create-shopping-cart;
+	$new
+}
+
+multi method create-shopping-cart(::?CLASS:D:) is command {
+	die "Shopping cart for user $!user already created" if $!created-at;
+	$.shopping-cart-created;
 }
 
 multi method apply(ShoppingCartCreated $_) {

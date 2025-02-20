@@ -1,5 +1,5 @@
 use Sourcing;
-unit event AccountCreated;
+unit event Event::AccountCreated;
 
 has Str $.id      is required;
 has Rat $.initial;

@@ -3,8 +3,12 @@ use Sourcing::ProjectionArg;
 use Sourcing::Projection;
 use Sourcing::Utils;
 
+# TODO: Add a way to use aggregation-id with different names on different applies
+#
+# multi method apply(MyEvent $_) is mapping-aggregation-ids{id-on-event => "id-on-projection"} {...}
+# multi method apply(MyEvent $_) is mapping-projection-args{timestamp => <from-timestamp to-timestamp>} {...}
+
 multi trait_mod:<is>(Attribute $r, Bool :$aggregation-id!) is export {
-	#trait_mod:<is>($r, :required);
 	$r does Sourcing::AggregationId
 }
 

@@ -23,8 +23,7 @@
     "Sourcing::EventStore::Red": "lib/Sourcing/EventStore/Red.rakumod",
     "Sourcing::Manager": "lib/Sourcing/Manager.rakumod",
     "Sourcing::Projection": "lib/Sourcing/Projection.rakumod",
-    "Sourcing::ProjectionArg": "lib/Sourcing/ProjectionArg.rakumod",
-    "Sourcing::ProjectionClient": "lib/Sourcing/ProjectionClient.rakumod"
+    "Sourcing::ProjectionArg": "lib/Sourcing/ProjectionArg.rakumod"
   },
   "resources": [
   ],

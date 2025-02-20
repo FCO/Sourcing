@@ -20,19 +20,19 @@ event ProjectionRegistred {
 	has Str $.type;
 }
 
-method TWEAK(|) {
-	Supply.interval(1).tap: {
-		for %!instances.values -> $value {
-			$!manager-lock.protect: {
-				next without $value<instances>;
-				if process-path($value<instances>) {
-					$value<instances>:delete
-				}
-			}
-		}
-	}
-	nextsame;
-}
+#method TWEAK(|) {
+#	Supply.interval(1).tap: {
+#		for %!instances.values -> $value {
+#			$!manager-lock.protect: {
+#				next without $value<instances>;
+#				if process-path($value<instances>) {
+#					$value<instances>:delete
+#				}
+#			}
+#		}
+#	}
+#	nextsame;
+#}
 
 multi process-path(Sourcing::Projection $proj) {
 	$proj.should-it-be-killed: DateTime.now
@@ -92,6 +92,7 @@ multi method register-class(Str $type) is command {
 }
 
 multi method apply(ProjectionRegistred $_) {
+	#say "apply";
 	my $proj = ::(.type);
 	if !$proj && $proj ~~ Failure {
 		require ::(.type);
@@ -128,18 +129,18 @@ multi method _create-object(Str $type, *%data) {
 }
 
 multi method apply(ProjectionObjectCreated $_) {
+	#say "apply: ", $?LINE, " - ", $_;
 	my :(:$class, :%instances) := %!instances{.type};
 
 	my @agg = $class.^aggregation-ids-names;
 	my @arg = $class.^projection-arg-names;
 
 	my @path = |.data{|@agg, |@arg};
+
 	my $instance = %instances{||@path} = $class.new: |.data;
-	$!manager-lock.protect: {
-		%!instances{.type}<instances> = %instances;
-		$instance._receive-events;
-		$instance
-	}
+	%!instances{.type}<instances> = %instances;
+	$instance._receive-events;
+	$instance
 }
 
 multi method apply(Sourcing::Event $event) {
@@ -157,7 +158,6 @@ multi method apply(Sourcing::Event $event) {
 		my %arg is Map = $class.^projection-arg-map-from-event: $event;
 		my @path = |@agg, |@arg;
 		with %instances{||@path} {
-			#say "receiving event to .gist(): $event.gist()";
 			._receive-event: :$seq, $event;
 		} else {
 			$._create-object: $class.^name, |%agg, |%arg

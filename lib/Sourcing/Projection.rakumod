@@ -22,7 +22,6 @@ method receive-events {
 }
 
 multi method _receive-events(::?CLASS:D:) {
-	#say "--> receive-events: ", self.^name;
 	#$!timestamp-to-kill = DateTime.now.later: :30minutes;
 	my Capture $cap = \(
 		$!last-processed // -1,
@@ -31,8 +30,9 @@ multi method _receive-events(::?CLASS:D:) {
 		|$.^projection-arg-map,
 	);
 	my UInt $*SOURCING-MESSAGE-SEQ;
-	#say $cap;
-	for event-store.get-events: |$cap -> $event {
+	my @events = lazy  event-store.get-events: |$cap;
+	for @events -> $event {
+		#say "---> ", $event;
 		$.apply: $event;
 	}
 }

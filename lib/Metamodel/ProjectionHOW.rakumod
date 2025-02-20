@@ -1,6 +1,4 @@
-use OO::Actors;
 unit class Metamodel::ProjectionHOW is Metamodel::ClassHOW;
-use Sourcing::ProjectionClient;
 use Sourcing::Projection;
 use Sourcing::EventStore;
 use Sourcing::Utils;
@@ -45,13 +43,17 @@ method aggregation-ids-values($proj --> List()) {
 
 method projection-arg-map($proj --> Map()) {
 	do for $proj.^projection-arg-attrs {
-		.name.substr(2) => .get_value: $proj
+		my \value = .get_value: $proj;
+		next without value;
+		.name.substr(2) => value
 	}
 }
 
 method aggregation-ids-map($proj --> Map()) {
 	do for $proj.^aggregation-ids-attrs {
-		.name.substr(2) => .get_value: $proj
+		my \value = .get_value: $proj;
+		next without value;
+		.name.substr(2) => value
 	}
 }
 
