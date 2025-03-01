@@ -17,13 +17,21 @@
     "Metamodel::ProcessHOW": "lib/Metamodel/ProcessHOW.rakumod",
     "Metamodel::ProjectionHOW": "lib/Metamodel/ProjectionHOW.rakumod",
     "Sourcing": "lib/Sourcing.rakumod",
+    "Sourcing::Aggregation": "lib/Sourcing/Aggregation.rakumod",
     "Sourcing::AggregationId": "lib/Sourcing/AggregationId.rakumod",
+    "Sourcing::Client": "lib/Sourcing/Client.rakumod",
     "Sourcing::Event": "lib/Sourcing/Event.rakumod",
     "Sourcing::EventStore": "lib/Sourcing/EventStore.rakumod",
     "Sourcing::EventStore::Red": "lib/Sourcing/EventStore/Red.rakumod",
     "Sourcing::Manager": "lib/Sourcing/Manager.rakumod",
+    "Sourcing::Manager::ProjectionObjectCreated": "lib/Sourcing/Manager/ProjectionObjectCreated.rakumod",
+    "Sourcing::Manager::ProjectionRegistred": "lib/Sourcing/Manager/ProjectionRegistred.rakumod",
+    "Sourcing::Process": "lib/Sourcing/Process.rakumod",
+    "Sourcing::Process::Failed": "lib/Sourcing/Process/Failed.rakumod",
+    "Sourcing::Process::TimeoutWasSet": "lib/Sourcing/Process/TimeoutWasSet.rakumod",
     "Sourcing::Projection": "lib/Sourcing/Projection.rakumod",
-    "Sourcing::ProjectionArg": "lib/Sourcing/ProjectionArg.rakumod"
+    "Sourcing::ProjectionArg": "lib/Sourcing/ProjectionArg.rakumod",
+    "Sourcing::Utils": "lib/Sourcing/Utils.rakumod"
   },
   "resources": [
   ],

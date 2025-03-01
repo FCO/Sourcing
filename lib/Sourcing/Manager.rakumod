@@ -1,5 +1,8 @@
 use v6.e.PREVIEW;
 use Sourcing;
+use Sourcing::Utils;
+use Sourcing::Manager::ProjectionObjectCreated;
+use Sourcing::Manager::ProjectionRegistred;
 unit process Sourcing::Manager;
 
 use Sourcing::Event;
@@ -7,79 +10,15 @@ use Sourcing::Projection;
 use Sourcing::EventStore;
 
 has %.events;
-has %.instances;
+has %.instances = self.^name => %(class => self.WHAT, instances => %(Str => self));
 
 has Lock::Async $!manager-lock .= new;
 
-event ProjectionObjectCreated {
-	has Str $.type is required;
-	has     %.data;
-}
-
-event ProjectionRegistred {
-	has Str $.type;
-}
-
-#method TWEAK(|) {
-#	Supply.interval(1).tap: {
-#		for %!instances.values -> $value {
-#			$!manager-lock.protect: {
-#				next without $value<instances>;
-#				if process-path($value<instances>) {
-#					$value<instances>:delete
-#				}
-#			}
-#		}
-#	}
-#	nextsame;
-#}
-
-multi process-path(Sourcing::Projection $proj) {
-	$proj.should-it-be-killed: DateTime.now
-}
-
-multi process-path(%node where { .elems == 1 }) {
-	for %node.kv -> $key, $value {
-		if process-path($value) {
-			%node{$key}:delete;
-			return True
-		}
-	}
-	False
-}
-
-multi process-path(%node) {
-	for %node.kv -> $key, $value {
-		if process-path($value) {
-			%node{$key}:delete;
-		}
-	}
-	False
-}
-
-method get(::T $type, *%values --> T) is query {
-	self._get: $type, |%values
-}
-
-method _get(::T $type is copy, *%values --> T) {
-	$type = .^name without $type;
-
-	self._receive-events;
-
-	die "No entry for $type" unless %!instances{$type}:exists;
-	my :(:$class, :%instances) := %!instances{$type};
-
-	my @ids = |$class.^aggregation-ids-names, |$class.^projection-arg-names;
-
-	my @values = @ids.map: { %values{$_} }
-
-	my $instance = %instances{||@values};
-
-	with $instance {
-		.receive-events;
-		.return
-	}
-	T
+method get-instance(Str $type, %ids) is query{ :sync } {
+	my :(:%instances, :$class) := %!instances{$type};
+	my @names = |$class.^aggregation-ids-names, |$class.^projection-arg-names;
+	my @ids := %ids{@names};
+	%instances{||@ids} //= self.create-object: $type, |%ids
 }
 
 multi method register-class(Mu:U $type) {
@@ -87,18 +26,36 @@ multi method register-class(Mu:U $type) {
 }
 
 multi method register-class(Str $type) is command {
-	die "Class $type already registred" with %!instances{$type}; 
-	$.projection-registred: :$type
+	#die "Class $type already registred" with %!instances{$type}; 
+	return True with %!instances{$type}; 
+	$.projection-registred: :$type;
+	True
 }
 
-multi method apply(ProjectionRegistred $_) {
-	#say "apply";
-	my $proj = ::(.type);
-	if !$proj && $proj ~~ Failure {
-		require ::(.type);
-		$proj = ::(.type);
+method describe-class(Str $type) is query{ :sync } {
+	given %!instances{$type}<class> {
+		return %(
+			projection-arg  => .^projection-arg-attrs.map({ %( :name(.name), :type(.type) ) }).List,
+			aggregation-ids => .^aggregation-ids-attrs.map({ %( :name(.name), :type(.type) ) }).List,
+			queries         => .^methods>>.candidates.flat.grep(*.?is-query).map(-> &meth {
+				&meth.name => &meth.signature.params.skip.head(*-1)>>.raku.List
+			}).List,
+			commands        => .^methods>>.candidates.flat.grep(*.?is-command).map(-> &meth {
+				&meth.name => &meth.signature.params.skip.head(*-1)>>.raku.List
+			}).List,
+		)
+	}
+}
+
+multi method apply(Sourcing::Manager::ProjectionRegistred $_) {
+	my $type = .type;
+	try my $proj = ::($type);
+	if !$proj && $proj ~~ Failure || $proj === Any {
+		require ::($type);
+		$proj = ::($type);
 	}
 
+	$proj.throw if $proj ~~ Failure;
 	$proj.HOW.manager = self;
 	my @ids = $proj.^aggregation-ids-attrs.map: *.name.substr: 2;
 	%!instances{$proj.^name}<class> = $proj;
@@ -123,13 +80,12 @@ multi method _create-object(Str $type, *%data) {
 	my @arg = $class.^projection-arg-names;
 
 	my @path = |%data{|@agg, |@arg};
-	die "Object ($type: %data.raku()) already exists" with %instances{||@path};
+	#die "Object ($type: %data.raku()) already exists" with %instances{||@path};
 
-	$.projection-object-created: :$type, :%data;
+	$.projection-object-created(:$type, :%data);
 }
 
-multi method apply(ProjectionObjectCreated $_) {
-	#say "apply: ", $?LINE, " - ", $_;
+multi method apply(Sourcing::Manager::ProjectionObjectCreated $_) {
 	my :(:$class, :%instances) := %!instances{.type};
 
 	my @agg = $class.^aggregation-ids-names;
@@ -143,6 +99,35 @@ multi method apply(ProjectionObjectCreated $_) {
 	$instance
 }
 
+proto method _unload-object(| --> Bool()) {*}
+multi method _unload-object(%instances, []) {}
+multi method _unload-object(%instances, [$key]) { %instances{$key}:delete }
+multi method _unload-object(%instances, [$key, *@rest]) {
+	do if so $._unload-object: %instances{$key}, @rest {
+		%instances{$key}:delete unless %.instances{$key}
+	}
+}
+
+method unload-object(Str $type, *%data) is command {
+	my :(Sourcing::Projection :$class!, :%instances) := %!instances{$type};
+	my @agg = $class.^aggregation-ids-names;
+	my @arg = $class.^projection-arg-names;
+
+	my @path = |%data{|@agg, |@arg};
+
+	event-store.add-event: %instances{||@path};
+}
+
+multi method apply(Sourcing::Projection $projection) {
+	$._unload-object:
+		%!instances{$projection.^name},
+		[
+			|$projection.^aggregation-ids-values,
+			|$projection.^projection-arg-values,
+		]
+	;
+}
+
 multi method apply(Sourcing::Event $event) {
 	my $seq = $*SOURCING-MESSAGE-SEQ;
 	my @classes = gather for |$event.^mro, |$event.^roles -> $parent {
@@ -150,7 +135,7 @@ multi method apply(Sourcing::Event $event) {
 			.take with %!instances{ .^name }
 		}
 	}
-	die "Unexpected event $event.raku() (@classes[])" unless @classes;
+	#die "Unexpected event $event.raku() (@classes[])" unless @classes;
 	for @classes <-> %item (:$class!, :%instances, |) {
 		my @agg = $class.^aggregation-ids-from-event: $event;
 		my %agg is Map = $class.^aggregation-ids-map-from-event: $event;

@@ -1,20 +1,20 @@
 use Sourcing::Utils;
-unit role Sourcing::Projection;
+use Sourcing::Event;
+unit role Sourcing::Projection does Sourcing::Event;
 
 has Int         $!last-processed = 0;
 has Lock::Async $!lock .= new;
 has DateTime    $!timestamp-to-kill;
 
+method gist { nextsame }
+
 proto method apply($event) {
 	my $seq = $*SOURCING-MESSAGE-SEQ;
-	#say "initial({self.^name}) [[[ $*SOURCING-MESSAGE-SEQ ]]]((( $!last-processed )))";
-	#say "($*SOURCING-MESSAGE-SEQ) => apply: ", $event;
 	{
 		my $*SOURCING-MESSAGE-SEQ = $seq;
 		{*};
 	}
 	$!last-processed max= $*SOURCING-MESSAGE-SEQ;
-	#say "final({self.^name}) [[[ $*SOURCING-MESSAGE-SEQ ]]]((( $!last-processed )))";
 }
 
 method receive-events {
@@ -30,9 +30,8 @@ multi method _receive-events(::?CLASS:D:) {
 		|$.^projection-arg-map,
 	);
 	my UInt $*SOURCING-MESSAGE-SEQ;
-	my @events = lazy  event-store.get-events: |$cap;
+	my @events = lazy event-store.get-events: |$cap;
 	for @events -> $event {
-		#say "---> ", $event;
 		$.apply: $event;
 	}
 }

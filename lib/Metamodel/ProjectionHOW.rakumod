@@ -10,11 +10,11 @@ has                      $.manager     is rw;
 method compose(Mu $proj) {
 	self.add_role: $proj, Sourcing::Projection;
 
+	my $class := callsame;
 	with $proj.^find_method("gist") {
-		.&querify
+		.&querify: :sync
 	}
-
-	nextsame;
+	$class
 }
 
 method projection-arg-attrs($proj) {

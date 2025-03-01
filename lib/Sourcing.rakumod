@@ -17,7 +17,11 @@ multi trait_mod:<is>(Attribute $r, Bool :$projection-arg!) is export {
 }
 
 multi trait_mod:<is>(Routine $r, Bool :$query!) is export {
-	querify $r;
+	trait_mod:<is>($r, :query{ :!sync })
+}
+
+multi trait_mod:<is>(Routine $r, :%query! ( Bool :$sync = False )) is export {
+	querify $r, :$sync;
 }
 
 multi trait_mod:<is>(Routine $r, Bool :$command!) is export {

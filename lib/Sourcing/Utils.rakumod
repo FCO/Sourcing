@@ -1,6 +1,7 @@
+use RedEventStore::Client;
+
 sub event-store is export {
-	require Sourcing::EventStore::Red;
-	$*EVENT-STORE // $GLOBAL::EVENT-STORE //= Sourcing::EventStore::Red.new
+	return RedEventStore::Client.new
 }
 
 sub lockify(Routine $r) is export {
@@ -15,9 +16,17 @@ sub lockify(Routine $r) is export {
 	$r
 }
 
-sub querify(Routine $r) is export {
+sub querify(Routine $r, Bool :$sync = False) is export {
 	$r does role {
 		method is-query { True }
+	}
+
+	if $sync {
+		my &clone = $r.clone;
+		$r.wrap: my method (|c) {
+			self._receive-events;
+			clone self, |c
+		}
 	}
 	lockify $r
 }
